@@ -37,10 +37,8 @@ test('desktop: movement, switching mode, pause and persisted settings',async({pa
   await page.screenshot({path:'test-results/oye-settings-desktop.png'});
   await page.getByRole('button',{name:'Retour au campus'}).click();
   await page.screenshot({path:'test-results/oye-campus-desktop.png'});
-  await page.getByRole('button',{name:/Bibliothèque/}).click();
-  await expect(page.getByRole('heading',{name:'Bibliothèque'})).toBeVisible();
-  await page.waitForTimeout(500);
-  await page.screenshot({path:'test-results/oye-library-desktop.png'});
+  await expect(page.getByRole('button',{name:/Bibliothèque — verrouillé/})).toBeDisabled();
+  await expect(page.getByText(/Mission · étape 1/)).toBeVisible();
   expect(errors).toEqual([]);
 });
 test('mobile: usable settings and touch-to-move',async({browser})=>{

@@ -6,6 +6,7 @@ export function createLbsScene(scene:THREE.Scene){
   const groups={} as Record<ZoneId,THREE.Group>;
   const materials=new Map<string,THREE.MeshStandardMaterial>();
   const textures:THREE.Texture[]=[];
+  const taskVisuals=new Map<string,{complete:()=>void;reset:()=>void}>();
   const mats={cream:'#eadfc5',terracotta:'#a94d36',red:'#9a3e2d',blue:'#214e86',navy:'#193451',white:'#f3f1e9',wall:'#dadbd6',wood:'#d2b98c',dark:'#303a3c',gold:'#d8aa55'};
   function mat(color:string,metalness=0,roughness=.82){const key=color+metalness+roughness;if(!materials.has(key))materials.set(key,new THREE.MeshStandardMaterial({color,metalness,roughness}));return materials.get(key)!;}
   function group(id:ZoneId){const g=new THREE.Group();g.name=id;g.visible=id==='facade';scene.add(g);groups[id]=g;return g;}
@@ -28,6 +29,7 @@ export function createLbsScene(scene:THREE.Scene){
     else {const shape=new THREE.Shape();for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,r=i%2?.2:.48;const px=Math.cos(a)*r,py=Math.sin(a)*r;i?shape.lineTo(px,py):shape.moveTo(px,py);}shape.closePath();mesh(q,new THREE.ExtrudeGeometry(shape,{depth:.09,bevelEnabled:false}),mat(kind==='seal'?mats.blue:mats.gold,0,.35),0,0,0);}
     return q;
   }
+  function registerTask(id:string,complete:()=>void,reset:()=>void){taskVisuals.set(id,{complete,reset});reset();}
 
   // FAÇADE — arched terracotta bays and embossed cream tiles from IMG_9277–9290.
   const facade=group('facade');tiledFloor(facade,'#c9b99d');box(facade,44,.08,8,'#5b6668',0,-.01,15);for(let x=-20;x<=20;x+=4)box(facade,1.7,.02,.12,'#f3dc9b',x,.04,15);
@@ -43,6 +45,7 @@ export function createLbsScene(scene:THREE.Scene){
   box(facade,5.6,1.35,.12,mats.terracotta,-11,9.25,-3.38);box(facade,5.1,1.02,.12,'#71888c',-11,9.25,-3.24);sign(facade,'LBS','DIGITAL ACADEMY',3.4,1.3,12.8,5.1,-3.02);
   // Christmas tree and entrance quest.
   box(facade,.34,1,.34,'#6d5038',12.5,.5,5);for(let i=0;i<4;i++)mesh(facade,new THREE.ConeGeometry(1.8-i*.32,2.1,12),mat(i%2?'#35644a':'#27543e'),12.5,1.55+i*.75,5);questBeacon(facade,'facade',-9.8,-1.7,'seal');
+  const briefingGlow=new THREE.PointLight('#f2ca87',0,5);briefingGlow.position.set(-9.8,1.7,-2.3);facade.add(briefingGlow);registerTask('briefing',()=>{briefingGlow.intensity=3;},()=>{briefingGlow.intensity=.35;});
 
   // BIBLIOTHÈQUE — pale wood wall shelving, central tables and red/gold chairs.
   const library=group('library');roomShell(library,'#c7c5be');
@@ -51,6 +54,10 @@ export function createLbsScene(scene:THREE.Scene){
   table(library,-4,0,5,1.65);table(library,4,0,5,1.65);table(library,0,-4.2,5,1.65);
   for(const [x,z,r] of [[-5.7,1.5,Math.PI],[-2.3,1.5,Math.PI],[-5.7,-1.5,0],[-2.3,-1.5,0],[2.3,1.5,Math.PI],[5.7,1.5,Math.PI],[2.3,-1.5,0],[5.7,-1.5,0],[-1.7,-5.65,0],[1.7,-5.65,0]] as [number,number,number][])chair(library,x,z,r);
   for(const x of [-8,0,8])fluorescent(library,x,-1);fan(library,0,3);sign(library,'BIBLIOTHÈQUE','LBS · LIRE · APPRENDRE',7,1.2,0,4.25,-9.78,'#e7dfcf',mats.navy);questBeacon(library,'library',10.8,-7.5,'book');
+  const financeBook=box(library,.32,.62,.16,mats.gold,-12.2,1.08,-6.8);financeBook.rotation.z=.08;
+  const marketingBook=box(library,.32,.62,.16,mats.gold,7.5,1.08,-7.3);marketingBook.rotation.z=-.08;
+  const deskBooks=new THREE.Group();deskBooks.position.set(0,1,-3.8);library.add(deskBooks);for(let i=0;i<2;i++){const b=box(deskBooks,.75,.11,.48,i?mats.gold:mats.red,0,i*.12,0);b.rotation.y=i?.12:-.08;}
+  registerTask('finance',()=>{financeBook.visible=false;},()=>{financeBook.visible=true;});registerTask('marketing',()=>{marketingBook.visible=false;},()=>{marketingBook.visible=true;});registerTask('library-desk',()=>{deskBooks.visible=true;},()=>{deskBooks.visible=false;});
 
   // PRÉAU — tiled blue base, open metal roof, trusses, banners and movable seating.
   const preau=group('preau');tiledFloor(preau,'#bfc5c4');box(preau,30,1.15,.4,'#275996',0,.57,-9.8);box(preau,.4,1.15,20,'#275996',-14.8,.57,0);box(preau,.4,1.15,20,'#275996',14.8,.57,0);box(preau,30,4.4,.25,'#eee9de',0,2.2,-10);
@@ -58,18 +65,29 @@ export function createLbsScene(scene:THREE.Scene){
   const roofL=box(preau,30,.13,11,'#788286',0,6.15,-4.5);roofL.rotation.x=-.18;const roofR=box(preau,30,.13,11,'#788286',0,6.15,4.5);roofR.rotation.x=.18;
   for(const x of [-8,0,8])for(const z of [-1.5,3.5]){table(preau,x,z,4.3,1.6);chair(preau,x-1.35,z+1.2,Math.PI);chair(preau,x+1.35,z+1.2,Math.PI);chair(preau,x,z-1.2,0);}
   for(const x of [-9,-3,3,9])fluorescent(preau,x,-1,5.25);sign(preau,'LBS','VOUS MÉRITEZ LE MEILLEUR',10,1.5,0,3.2,-9.82,'#f4f0e6',mats.blue);questBeacon(preau,'preau',0,-7.8,'star');
+  function centerpiece(x:number,z:number){const c=new THREE.Group();c.position.set(x,1,z);preau.add(c);cylinder(c,.18,.16,mats.gold,0,0,0);mesh(c,new THREE.OctahedronGeometry(.28,0),mat(mats.red,0,.45),0,.32,0);return c;}
+  const leftCenter=centerpiece(-8,3.5),rightCenter=centerpiece(8,3.5);registerTask('table-left',()=>{leftCenter.visible=true;},()=>{leftCenter.visible=false;});registerTask('table-right',()=>{rightCenter.visible=true;},()=>{rightCenter.visible=false;});
+  const garlandMaterial=new THREE.MeshStandardMaterial({color:'#715c3b',emissive:'#000000',emissiveIntensity:0});materials.set('garland-special',garlandMaterial);const garlandBulbs:THREE.Mesh[]=[];for(let x=-11;x<=11;x+=1.4){const bulb=mesh(preau,new THREE.SphereGeometry(.11,10,8),garlandMaterial,x,4.35,-9.55);garlandBulbs.push(bulb);}registerTask('garland',()=>{garlandMaterial.color.set('#f4c76f');garlandMaterial.emissive.set('#e99634');garlandMaterial.emissiveIntensity=1.8;},()=>{garlandMaterial.color.set('#715c3b');garlandMaterial.emissive.set('#000');garlandMaterial.emissiveIntensity=0;});
 
   // GRANDE SALLE — R+1 lecture hall with screen, red aisle, tables, curtains and AC units.
   const hall=group('hall');roomShell(hall,'#4d4f4e');box(hall,2.4,.025,18,'#8c2532',0,.02,0);box(hall,11,3.2,.14,'#f8f7f1',0,2.9,-9.78);box(hall,11.5,.15,.22,mats.dark,0,4.53,-9.64);sign(hall,'GRANDE SALLE','CONFÉRENCE · R+1',8,.8,0,5.15,-9.76,'#e9e6dd',mats.navy);
   for(const z of [-6,-2,2,6])for(const x of [-7,0,7]){table(hall,x,z,4.6,1.15);chair(hall,x-1.35,z+1,Math.PI);chair(hall,x,z+1,Math.PI);chair(hall,x+1.35,z+1,Math.PI);}
   for(const x of [-10,-3.3,3.3,10])fluorescent(hall,x,-1);for(const z of [-6,-1,4]){box(hall,.16,3.5,2.5,'#6f7474',-14.72,2.3,z);box(hall,.16,3.5,2.5,'#6f7474',14.72,2.3,z);}for(const x of [-10,10])box(hall,2.4,.65,.5,'#f2eee4',x,4.7,-9.3);
   box(hall,1.1,1.1,.55,mats.wood,-3.8,.57,-7.8);questBeacon(hall,'hall',0,-7.4,'mic');
+  const breakerLight=new THREE.Mesh(new THREE.SphereGeometry(.12,10,8),new THREE.MeshStandardMaterial({color:'#9e3434',emissive:'#4a0000',emissiveIntensity:.5}));breakerLight.position.set(-14.55,2.2,-7.6);hall.add(breakerLight);
+  const projectorLight=new THREE.PointLight('#b9d8ff',0,9);projectorLight.position.set(0,3,-7.5);hall.add(projectorLight);
+  const soundRings=new THREE.Group();soundRings.position.set(0,1.1,-7.4);hall.add(soundRings);for(let i=0;i<3;i++){const r=mesh(soundRings,new THREE.TorusGeometry(.24+i*.12,.025,6,20,Math.PI),mat('#f2ca87'),0,i*.14,0);r.rotation.z=Math.PI/2;}
+  const welcome=sign(hall,'BIENVENUE','LA VEILLÉE DE NOËL COMMENCE',8,1.15,0,3,-9.56,'#173f57','#f2ca87');
+  registerTask('breaker',()=>{(breakerLight.material as THREE.MeshStandardMaterial).color.set('#55b97c');(breakerLight.material as THREE.MeshStandardMaterial).emissive.set('#1c8a4c');},()=>{(breakerLight.material as THREE.MeshStandardMaterial).color.set('#9e3434');(breakerLight.material as THREE.MeshStandardMaterial).emissive.set('#4a0000');});
+  registerTask('projector',()=>{projectorLight.intensity=5;},()=>{projectorLight.intensity=0;});registerTask('microphone',()=>{soundRings.visible=true;},()=>{soundRings.visible=false;});registerTask('open-doors',()=>{welcome.visible=true;},()=>{welcome.visible=false;});
 
   const quests={} as Record<ZoneId,THREE.Group>;for(const id of Object.keys(groups) as ZoneId[]){const q=groups[id].getObjectByName('quest-'+id) as THREE.Group;quests[id]=q;}
   let active:ZoneId='facade';
   return {
     setZone(id:ZoneId){active=id;for(const key of Object.keys(groups) as ZoneId[])groups[key].visible=key===id;},
     getZone(){return active;},quests,
+    completeStep(id:string){taskVisuals.get(id)?.complete();},
+    resetTasks(){taskVisuals.forEach(task=>task.reset());},
     animate(time:number,reduced:boolean){for(const id of Object.keys(quests) as ZoneId[]){const q=quests[id];if(q.visible){q.rotation.y=reduced?0:time*.8;q.position.y=.85+(reduced?0:Math.sin(time*2+id.length)*.08);}}},
     dispose(){textures.forEach(t=>t.dispose());materials.forEach(m=>m.dispose());},
   };

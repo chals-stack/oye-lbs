@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {clearSegment,findRoute,isWalkable} from '../app/movement';
-import {ZONE_LAYOUTS,ZONE_ORDER} from '../app/lbs-layout';
+import {MISSION_STEPS,ZONE_LAYOUTS,ZONE_ORDER,unlockedZones} from '../app/lbs-layout';
 test('LBS: every photo-derived room objective is reachable',()=>{
   for(const id of ZONE_ORDER){
     const {spawn,target,obstacles}=ZONE_LAYOUTS[id];
@@ -10,6 +10,20 @@ test('LBS: every photo-derived room objective is reachable',()=>{
     let start=spawn;
     for(const point of route){expect(clearSegment(start,point,obstacles)).toBe(true);start=point;}
     expect(start).toEqual(target);
+  }
+});
+test('mission progression: every interaction point is reachable and rooms unlock in order',()=>{
+  expect(unlockedZones(0)).toEqual(['facade']);
+  expect(unlockedZones(1)).toEqual(['facade','library']);
+  expect(unlockedZones(4)).toEqual(['facade','library','preau']);
+  expect(unlockedZones(7)).toEqual(['facade','library','preau','hall']);
+  for(const id of ZONE_ORDER){
+    const layout=ZONE_LAYOUTS[id];let start=layout.spawn;
+    for(const step of MISSION_STEPS.filter(step=>step.zone===id)){
+      expect(isWalkable(step.position.x,step.position.z,layout.obstacles),step.id).toBe(true);
+      const route=findRoute(start,step.position,layout.obstacles);
+      expect(route.length,step.id).toBeGreaterThan(0);start=step.position;
+    }
   }
 });
 test('direct route, invalid destination and campus boundaries',()=>{

@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {createCharacter} from './character';
 import {createLbsScene} from './lbs-scene';
-import {ZONE_LAYOUTS,ZONE_ORDER,type ZoneId} from './lbs-layout';
+import {MISSION_STEPS,ZONE_LAYOUTS,unlockedZones,type ZoneId} from './lbs-layout';
 import {findRoute,isWalkable,type Point} from './movement';
 
 export type Preferences={mode:'keys'|'pointer';running:boolean;color:string;reduced:boolean;zoom:number};
 export type GameInput={keys:Set<string>;preferences:Preferences;paused:boolean;overview?:boolean};
-export type GameState={zone:ZoneId;score:number;objective:string;completed:boolean};
+export type GameState={zone:ZoneId;stepIndex:number;totalSteps:number;task:string;instruction:string;action:string;canInteract:boolean;completed:boolean;unlocked:ZoneId[]};
 
 export function createGame(host:HTMLDivElement,input:GameInput,onState:(state:GameState)=>void){
  const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
@@ -16,10 +16,14 @@ export function createGame(host:HTMLDivElement,input:GameInput,onState:(state:Ga
  const campus=createLbsScene(scene),avatar=createCharacter(),player=avatar.root;scene.add(player);
  const ring=new THREE.Mesh(new THREE.RingGeometry(.48,.56,40),new THREE.MeshBasicMaterial({color:'#f2ca87',side:THREE.DoubleSide,transparent:true,opacity:.82}));ring.rotation.x=-Math.PI/2;ring.position.y=.015;scene.add(ring);
  const marker=new THREE.Mesh(new THREE.RingGeometry(.27,.38,40),new THREE.MeshBasicMaterial({color:'#d9584e',side:THREE.DoubleSide}));marker.rotation.x=-Math.PI/2;marker.position.y=.02;marker.visible=false;scene.add(marker);
- const velocity=new THREE.Vector3(),desired=new THREE.Vector3(),follow=new THREE.Vector3();const visited=new Set<ZoneId>();
- let zone:ZoneId='facade',route:Point[]=[],held=false,pointerId:number|null=null,lastMode=input.preferences.mode,previousColor='',frame=0,elapsed=0,lastPlan=0;
+ const objective=new THREE.Group();const objectiveRing=new THREE.Mesh(new THREE.RingGeometry(.58,.72,48),new THREE.MeshBasicMaterial({color:'#f2ca87',side:THREE.DoubleSide,transparent:true,opacity:.9}));objectiveRing.rotation.x=-Math.PI/2;const objectiveBeam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.18,2.5,12,1,true),new THREE.MeshBasicMaterial({color:'#f2ca87',transparent:true,opacity:.22,side:THREE.DoubleSide}));objectiveBeam.position.y=1.25;objective.add(objectiveRing,objectiveBeam);scene.add(objective);
+ const velocity=new THREE.Vector3(),desired=new THREE.Vector3(),follow=new THREE.Vector3();
+ let zone:ZoneId='facade',stepIndex=0,canInteract=false,route:Point[]=[],held=false,pointerId:number|null=null,lastMode=input.preferences.mode,previousColor='',frame=0,elapsed=0,lastPlan=0;
  const pointer=new THREE.Vector2(),ray=new THREE.Raycaster(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();
- const state=()=>onState({zone,score:visited.size,objective:ZONE_LAYOUTS[zone].objective,completed:visited.size===ZONE_ORDER.length});
+ const currentStep=()=>MISSION_STEPS[Math.min(stepIndex,MISSION_STEPS.length-1)];
+ const state=()=>{const step=currentStep();onState({zone,stepIndex,totalSteps:MISSION_STEPS.length,task:step?.title??'Mission accomplie',instruction:step?.instruction??'La veillée de Noël peut commencer.',action:step?.action??'',canInteract,completed:stepIndex>=MISSION_STEPS.length,unlocked:unlockedZones(stepIndex)});};
+ function syncObjective(){const step=currentStep(),done=stepIndex>=MISSION_STEPS.length;objective.visible=!done&&step.zone===zone;if(!done)objective.position.set(step.position.x,.04,step.position.z);for(const id of Object.keys(campus.quests) as ZoneId[])campus.quests[id].visible=false;}
+ function interact(){if(!canInteract||stepIndex>=MISSION_STEPS.length)return;campus.completeStep(currentStep().id);stepIndex++;canInteract=false;syncObjective();state();}
  function stop(){input.keys.clear();route=[];velocity.set(0,0,0);held=false;marker.visible=false;}
  function plan(){ray.setFromCamera(pointer,camera);if(!ray.ray.intersectPlane(plane,hit))return;route=findRoute(player.position,{x:hit.x,z:hit.z},ZONE_LAYOUTS[zone].obstacles);marker.position.set(hit.x,.02,hit.z);marker.visible=true;marker.material.color.set(route.length?'#cd5447':'#8d9699');}
  function updatePointer(e:PointerEvent){const r=canvas.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);}
@@ -29,12 +33,12 @@ export function createGame(host:HTMLDivElement,input:GameInput,onState:(state:Ga
  function pointerCancel(){stop();pointerId=null;}
  canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerCancel);canvas.addEventListener('lostpointercapture',pointerUp);
  const controls=new Set(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','z','q','shift']);
- function down(e:KeyboardEvent){if(input.paused)return;const key=e.key.toLowerCase();if(key==='escape'){stop();return;}if(input.preferences.mode==='keys'&&controls.has(key)){e.preventDefault();input.keys.add(key);}}
+ function down(e:KeyboardEvent){if(input.paused)return;const key=e.key.toLowerCase();if(key==='escape'){stop();return;}if(key==='e'||key==='enter'){e.preventDefault();interact();return;}if(input.preferences.mode==='keys'&&controls.has(key)){e.preventDefault();input.keys.add(key);}}
  function up(e:KeyboardEvent){input.keys.delete(e.key.toLowerCase());}
  const visibility=()=>{if(document.hidden)stop();};window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',stop);document.addEventListener('visibilitychange',visibility);
  const resize=()=>{camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight);};const observer=new ResizeObserver(resize);observer.observe(host);resize();
- function goToZone(next:ZoneId){stop();zone=next;campus.setZone(next);const spawn=ZONE_LAYOUTS[next].spawn;player.position.set(spawn.x,0,spawn.z);player.rotation.y=Math.PI;follow.copy(player.position);const interior=next!=='facade';scene.background=new THREE.Color(interior?'#bfc8c8':'#c8d7d8');scene.fog=new THREE.Fog(interior?'#bfc8c8':'#c8d7d8',interior?35:48,interior?75:95);state();}
- function reset(){visited.clear();for(const id of ZONE_ORDER)campus.quests[id].visible=true;goToZone('facade');}
+ function goToZone(next:ZoneId){if(!unlockedZones(stepIndex).includes(next))return false;stop();canInteract=false;zone=next;campus.setZone(next);const spawn=ZONE_LAYOUTS[next].spawn;player.position.set(spawn.x,0,spawn.z);player.rotation.y=Math.PI;follow.copy(player.position);const interior=next!=='facade';scene.background=new THREE.Color(interior?'#bfc8c8':'#c8d7d8');scene.fog=new THREE.Fog(interior?'#bfc8c8':'#c8d7d8',interior?35:48,interior?75:95);syncObjective();state();return true;}
+ function reset(){campus.resetTasks();stepIndex=0;canInteract=false;goToZone('facade');}
  reset();const clock=new THREE.Clock();
  function animate(){
   frame=requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);elapsed+=dt;const prefs=input.preferences;
@@ -47,11 +51,11 @@ export function createGame(host:HTMLDivElement,input:GameInput,onState:(state:Ga
    if(isWalkable(nx,player.position.z,obstacles))player.position.x=nx;else velocity.x=0;if(isWalkable(player.position.x,nz,obstacles))player.position.z=nz;else velocity.z=0;
    const actual=player.position.clone().sub(before),moving=actual.length()/Math.max(dt,.0001);if(moving>.05){const angle=Math.atan2(actual.x,actual.z),delta=Math.atan2(Math.sin(angle-player.rotation.y),Math.cos(angle-player.rotation.y));player.rotation.y+=delta*(1-Math.exp(-dt*14));}
    avatar.animate(dt,moving,elapsed,prefs.reduced);
-   const target=ZONE_LAYOUTS[zone].target;if(!visited.has(zone)&&Math.hypot(player.position.x-target.x,player.position.z-target.z)<1.15){visited.add(zone);campus.quests[zone].visible=false;state();}
+   if(stepIndex<MISSION_STEPS.length){const step=currentStep(),near=step.zone===zone&&Math.hypot(player.position.x-step.position.x,player.position.z-step.position.z)<1.65;if(near!==canInteract){canInteract=near;state();}}
   }
-  campus.animate(elapsed,prefs.reduced);ring.position.set(player.position.x,.02,player.position.z);follow.lerp(player.position,prefs.reduced?1:1-Math.exp(-dt*7));
+  campus.animate(elapsed,prefs.reduced);if(objective.visible){objectiveRing.rotation.z=elapsed*.65;objectiveBeam.material.opacity=.15+(prefs.reduced?0:Math.sin(elapsed*3)*.06);}ring.position.set(player.position.x,.02,player.position.z);follow.lerp(player.position,prefs.reduced?1:1-Math.exp(-dt*7));
   if(input.overview){camera.position.set(18,24,24);camera.lookAt(0,1,-1);}else{camera.position.set(follow.x+prefs.zoom*.23,prefs.zoom*.68,follow.z+prefs.zoom*.76);camera.lookAt(follow.x,1.55,follow.z-1.4);}camera.updateMatrixWorld();renderer.render(scene,camera);
  }
  animate();
- return {reset,stop,goToZone,dispose(){cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',visibility);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerCancel);canvas.removeEventListener('lostpointercapture',pointerUp);const geometries=new Set<THREE.BufferGeometry>(),mats=new Set<THREE.Material>();scene.traverse(o=>{if(o instanceof THREE.Mesh){geometries.add(o.geometry);(Array.isArray(o.material)?o.material:[o.material]).forEach((m:THREE.Material)=>mats.add(m));}});geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());campus.dispose();renderer.dispose();canvas.remove();}};
+ return {reset,stop,interact,goToZone,dispose(){cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',visibility);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerCancel);canvas.removeEventListener('lostpointercapture',pointerUp);const geometries=new Set<THREE.BufferGeometry>(),mats=new Set<THREE.Material>();scene.traverse(o=>{if(o instanceof THREE.Mesh){geometries.add(o.geometry);(Array.isArray(o.material)?o.material:[o.material]).forEach((m:THREE.Material)=>mats.add(m));}});geometries.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());campus.dispose();renderer.dispose();canvas.remove();}};
 }

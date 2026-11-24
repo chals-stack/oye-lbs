@@ -2,9 +2,11 @@
 
 La carte représente une interprétation jouable de **Lomé Business School**, construite à partir de photographies prises sur place : façade R+1 crème et terre cuite, entrée LBS, bibliothèque, préau et grande salle. Les proportions sont adaptées au jeu et ne constituent pas un relevé architectural. Voir `docs/lbs-reference.md`.
 
-Le bouton **Voir toute l’école** affiche une vue d’ensemble. La navigation supérieure permet de visiter les quatre zones, chacune avec un sceau de Noël à retrouver.
+Le bouton **Voir toute l’école** affiche une vue d’ensemble. La navigation supérieure permet de visiter les quatre zones à mesure qu’elles sont débloquées par la mission.
 
-Prototype solo 3D : déplacement au clavier (ZQSD, WASD, flèches), à la souris ou au tactile, collisions avec le bâtiment et le mobilier, collecte de quatre sceaux et redémarrage.
+Prototype solo 3D : déplacement au clavier (ZQSD, WASD, flèches), à la souris ou au tactile, collisions avec le bâtiment et le mobilier, et mission de préparation de la veillée en 11 étapes.
+
+Le joueur doit consulter le briefing, sélectionner des ouvrages dans la bibliothèque, préparer les tables du préau puis mettre en service la grande salle. Les actions se déclenchent volontairement avec `E`, `Entrée` ou le bouton contextuel tactile. Elles ont un effet visible sur le décor : livres déplacés, centres de table installés, guirlande allumée, alimentation, projection et son activés. Les salles se débloquent dans l’ordre de la mission.
 
 ## Personnage et commandes
 
