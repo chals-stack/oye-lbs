@@ -8,3 +8,7 @@ playwright-report/
 reference-photos/
 reference-photos-jpg/
 reference-sheets/
+.tools-gh/
+.tools-gh.zip
+
+.vercel
