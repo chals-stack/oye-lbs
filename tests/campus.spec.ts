@@ -1,0 +1,58 @@
+import {test,expect} from '@playwright/test';
+test('desktop: movement, switching mode, pause and persisted settings',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button',{name:'Paramètres'}).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByLabel('Réduire les animations').check();
+  await page.getByRole('button',{name:'Vert sapin'}).click();
+  await page.getByRole('button',{name:'Retour au campus'}).click();
+  await page.waitForTimeout(400);
+  const before=await page.locator('canvas').screenshot();
+  await page.keyboard.down('ArrowRight');await page.waitForTimeout(650);await page.keyboard.up('ArrowRight');await page.waitForTimeout(400);
+  expect((await page.locator('canvas').screenshot()).equals(before)).toBe(false);
+  await page.getByRole('button',{name:'Paramètres'}).click();
+  await page.getByRole('radio',{name:/Curseur guidé/}).check();
+  await page.getByRole('button',{name:'Retour au campus'}).click();
+  await expect(page.getByRole('button',{name:'Avancer',exact:true})).toHaveCount(0);
+  const atRest=await page.locator('canvas').screenshot();
+  const bounds=(await page.locator('canvas').boundingBox())!;
+  // Aim at the open forecourt, below and left of the character.
+  await page.mouse.click(bounds.width*.35,bounds.height*.55);
+  await page.waitForTimeout(900);
+  expect((await page.locator('canvas').screenshot()).equals(atRest)).toBe(false);
+  await page.getByRole('button',{name:'Paramètres'}).click();
+  await page.waitForTimeout(200);
+  // Mask the modal: keyboard focus outlines may change while the world is paused.
+  const paused=await page.locator('canvas').screenshot({mask:[page.getByRole('dialog')]});
+  await page.keyboard.press('ArrowUp');await page.waitForTimeout(300);
+  expect((await page.locator('canvas').screenshot({mask:[page.getByRole('dialog')]})).equals(paused)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await page.reload();await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button',{name:'Paramètres'}).click();
+  await expect(page.getByRole('radio',{name:/Curseur guidé/})).toBeChecked();
+  await expect(page.getByRole('button',{name:'Vert sapin'})).toHaveAttribute('aria-pressed','true');
+  await page.screenshot({path:'test-results/oye-settings-desktop.png'});
+  await page.getByRole('button',{name:'Retour au campus'}).click();
+  await page.screenshot({path:'test-results/oye-campus-desktop.png'});
+  await page.getByRole('button',{name:/Bibliothèque/}).click();
+  await expect(page.getByRole('heading',{name:'Bibliothèque'})).toBeVisible();
+  await page.waitForTimeout(500);
+  await page.screenshot({path:'test-results/oye-library-desktop.png'});
+  expect(errors).toEqual([]);
+});
+test('mobile: usable settings and touch-to-move',async({browser})=>{
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+ const page=await context.newPage();await page.goto('http://127.0.0.1:3012/');await expect(page.locator('canvas')).toBeVisible();
+ await page.getByRole('button',{name:'Paramètres'}).tap();
+ await page.getByRole('radio',{name:/Curseur guidé/}).check();
+ await page.getByLabel('Réduire les animations').check();
+ await page.getByRole('button',{name:'Retour au campus'}).tap();await page.waitForTimeout(300);
+ const before=await page.locator('canvas').screenshot();
+ await page.touchscreen.tap(270,430);await page.waitForTimeout(900);
+ expect((await page.locator('canvas').screenshot()).equals(before)).toBe(false);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/oye-campus-mobile.png'});await context.close();
+});
