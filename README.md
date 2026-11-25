@@ -8,6 +8,15 @@ Prototype solo 3D : déplacement au clavier (ZQSD, WASD, flèches), à la souris
 
 Le joueur doit consulter le briefing, sélectionner des ouvrages dans la bibliothèque, préparer les tables du préau puis mettre en service la grande salle. Les actions se déclenchent volontairement avec `E`, `Entrée` ou le bouton contextuel tactile. Elles ont un effet visible sur le décor : livres déplacés, centres de table installés, guirlande allumée, alimentation, projection et son activés. Les salles se débloquent dans l’ordre de la mission.
 
+## Mini-jeux
+
+Le bouton **Mini-jeux** ouvre la Campus Arcade :
+
+- **Éclats de Noël** : puzzle match-3 en 20 déplacements, avec cascades, combos et objectif de score.
+- **Lomé Ride** : course moto originale en trois voies dans plusieurs quartiers de Lomé, avec circulation, nids-de-poule, pièces CFA, vies et difficulté progressive.
+
+Les deux jeux fonctionnent au clavier, à la souris et au tactile. Les victoires rapportent des tickets Oye conservés localement sur l’appareil. Lomé Ride a été conçu après étude du genre et du projet public Zem Rush, avec une implémentation et une direction artistique propres à Oye.
+
 ## Personnage et commandes
 
 Avatar d’hiver articulé : bonnet, écharpe, sac à dos, marche et course animées. Les directions suivent la caméra ; Maj permet de courir. Accélération, freinage et rotation sont progressifs.

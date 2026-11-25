@@ -2,28 +2,32 @@
 import {useEffect,useRef,useState} from 'react';
 import {createGame,type Preferences,type GameInput,type GameState} from './game';
 import {ZONE_LAYOUTS,ZONE_ORDER,type ZoneId} from './lbs-layout';
+import Arcade from './minigames/Arcade';
 const defaults:Preferences={mode:'keys',running:false,color:'#ce4b48',reduced:false,zoom:22};
 const colors=[{value:'#ce4b48',name:'Rouge Noël'},{value:'#3d8074',name:'Vert sapin'},{value:'#537ba4',name:'Bleu glacier'}];
 export default function Campus(){
  const mount=useRef<HTMLDivElement>(null),dialog=useRef<HTMLDialogElement>(null),settingsButton=useRef<HTMLButtonElement>(null);
  const engine=useRef<ReturnType<typeof createGame>|null>(null);
  const input=useRef<GameInput>({keys:new Set(),preferences:defaults,paused:false});
- const [preferences,setPreferences]=useState(defaults),[gameState,setGameState]=useState<GameState>({zone:'facade',stepIndex:0,totalSteps:11,task:'Prendre le briefing',instruction:'Consulte le panneau lumineux près de l’entrée LBS.',action:'Lire le briefing',canInteract:false,completed:false,unlocked:['facade']}),[ready,setReady]=useState(false),[error,setError]=useState(false),[settings,setSettings]=useState(false),[overview,setOverview]=useState(false);
+ const [preferences,setPreferences]=useState(defaults),[gameState,setGameState]=useState<GameState>({zone:'facade',stepIndex:0,totalSteps:11,task:'Prendre le briefing',instruction:'Consulte le panneau lumineux près de l’entrée LBS.',action:'Lire le briefing',canInteract:false,completed:false,unlocked:['facade']}),[ready,setReady]=useState(false),[error,setError]=useState(false),[settings,setSettings]=useState(false),[overview,setOverview]=useState(false),[arcade,setArcade]=useState(false),[tickets,setTickets]=useState(0);
  useEffect(()=>{
   let prefs={...defaults,reduced:window.matchMedia('(prefers-reduced-motion: reduce)').matches};
   try{const saved=JSON.parse(localStorage.getItem('oye.preferences')??'null');if(saved){prefs={mode:saved.mode==='pointer'?'pointer':'keys',running:saved.running===true,color:colors.some(c=>c.value===saved.color)?saved.color:defaults.color,reduced:typeof saved.reduced==='boolean'?saved.reduced:prefs.reduced,zoom:typeof saved.zoom==='number'&&Number.isFinite(saved.zoom)?Math.max(14,Math.min(24,saved.zoom)):22};}}catch{/* Storage is optional. */}
-  input.current.preferences=prefs;setPreferences(prefs);
+  input.current.preferences=prefs;setPreferences(prefs);setTickets(Math.max(0,Number(localStorage.getItem('oye.tickets'))||0));
   try{engine.current=createGame(mount.current!,input.current,setGameState);setReady(true);}catch(e){console.error('Initialisation 3D',e);setError(true);}
   return()=>{engine.current?.dispose();engine.current=null;};
  },[]);
  function update(patch:Partial<Preferences>){const next={...input.current.preferences,...patch};engine.current?.stop();input.current.preferences=next;setPreferences(next);try{localStorage.setItem('oye.preferences',JSON.stringify(next));}catch{/* Optional storage. */}}
  function openSettings(){engine.current?.stop();input.current.paused=true;setSettings(true);dialog.current?.showModal();}
  function closeSettings(){dialog.current?.close();input.current.paused=false;setSettings(false);settingsButton.current?.focus();}
+ function openArcade(){engine.current?.stop();input.current.paused=true;setArcade(true);}
+ function closeArcade(){input.current.paused=false;setArcade(false);}
+ function rewardTickets(amount:number){setTickets(value=>{const next=value+amount;try{localStorage.setItem('oye.tickets',String(next));}catch{}return next;});}
  const directions=[['',''],['↑','arrowup'],['',''],['←','arrowleft'],['↓','arrowdown'],['→','arrowright']];
  function visit(zone:ZoneId){input.current.overview=false;setOverview(false);engine.current?.goToZone(zone);}
  return <main className="game relative">
   <div ref={mount} className="absolute inset-0" aria-label="Campus de Noël en 3D"/>
-  <header className="game-header"><div className="panel brand"><span className="text-4xl font-black tracking-tighter">oye<span className="text-red-400">.</span></span><span className="brand-subtitle">LBS · Lomé</span></div><button ref={settingsButton} onClick={openSettings} className="panel settings-button" aria-haspopup="dialog" aria-expanded={settings}>⚙ <span>Paramètres</span></button></header>
+  <header className="game-header"><div className="panel brand"><span className="text-4xl font-black tracking-tighter">oye<span className="text-red-400">.</span></span><span className="brand-subtitle">LBS · Lomé</span></div><div className="header-actions"><button aria-label={`Mini-jeux, ${tickets} tickets`} onClick={openArcade} className="panel arcade-button">▦ <span>Mini-jeux</span><small>{tickets}</small></button><button aria-label="Paramètres" ref={settingsButton} onClick={openSettings} className="panel settings-button" aria-haspopup="dialog" aria-expanded={settings}>⚙ <span>Paramètres</span></button></div></header>
   <section className="panel mission"><p className="eyebrow">Mission · étape {Math.min(gameState.stepIndex+1,gameState.totalSteps)} / {gameState.totalSteps}</p><h1>{gameState.task}</h1><p className="mission-description">{gameState.instruction}</p><div className="mission-zone"><span>{ZONE_LAYOUTS[gameState.zone].kicker}</span><strong>{ZONE_LAYOUTS[gameState.zone].name}</strong></div><div className="mission-count"><span aria-live="polite">Préparation de la veillée</span><span>{Math.round(gameState.stepIndex/gameState.totalSteps*100)}%</span></div><div className="progress-track"><div style={{width:gameState.stepIndex/gameState.totalSteps*100+'%'}}/></div></section>
   <nav className="panel zone-nav" aria-label="Espaces de l’école">{ZONE_ORDER.map((id,index)=>{const unlocked=gameState.unlocked.includes(id);return <button key={id} disabled={!unlocked} aria-label={ZONE_LAYOUTS[id].name+(unlocked?'':' — verrouillé')} aria-current={gameState.zone===id?'page':undefined} onClick={()=>visit(id)}><span>{unlocked?index+1:'⌁'}</span>{ZONE_LAYOUTS[id].name}</button>})}</nav>
   <button className="panel overview-button" aria-pressed={overview} onClick={()=>{engine.current?.stop();input.current.overview=!overview;setOverview(!overview);}}>{overview?'↘ Revenir au personnage':'↗ Voir toute l’école'}</button>
@@ -43,6 +47,7 @@ export default function Campus(){
    <button className="primary-button" onClick={closeSettings}>Retour au campus →</button><p className="saved-note">Tes préférences sont conservées sur cet appareil.</p>
   </dialog>
   {gameState.completed&&!settings&&<div className="completion"><section className="panel"><p className="text-4xl">✦</p><p className="eyebrow">Mission terminée</p><h2>La veillée peut commencer.</h2><p>Les livres sont prêts, le préau est décoré et la grande salle est opérationnelle.</p><button className="primary-button" onClick={()=>engine.current?.reset()}>Recommencer la mission</button></section></div>}
+  {arcade&&<Arcade tickets={tickets} onReward={rewardTickets} onClose={closeArcade}/>} 
   {error&&<div className="completion"><section className="panel"><h2>La 3D est indisponible</h2><p>Active l’accélération graphique de ton navigateur, puis recharge la page.</p></section></div>}
  </main>;
 }

@@ -54,3 +54,18 @@ test('mobile: usable settings and touch-to-move',async({browser})=>{
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/oye-campus-mobile.png'});await context.close();
 });
+test('arcade: both mini-games open and accept controls',async({page})=>{
+ await page.goto('/');await expect(page.locator('canvas')).toBeVisible();
+ await page.getByRole('button',{name:/Mini-jeux/}).click();
+ await expect(page.getByRole('heading',{name:'Choisis ton défi.'})).toBeVisible();
+ await page.screenshot({path:'test-results/oye-arcade.png'});
+ await page.getByRole('button',{name:/Éclats de Noël/}).click();
+ await expect(page.getByRole('heading',{name:'Éclats de Noël'})).toBeVisible();
+ await page.screenshot({path:'test-results/oye-match-three.png'});
+ const cells=page.getByRole('gridcell');await expect(cells).toHaveCount(49);await cells.nth(0).click();await expect(cells.nth(0)).toHaveAttribute('aria-selected','true');
+ await page.getByRole('button',{name:'Arcade'}).click();
+ await page.getByRole('button',{name:/Lomé Ride/}).click();
+ await expect(page.getByRole('heading',{name:'Lomé Ride'})).toBeVisible();await page.getByRole('button',{name:'Démarrer la moto'}).click();
+ await page.getByRole('button',{name:'Voie de droite'}).click();await page.waitForTimeout(400);await page.screenshot({path:'test-results/oye-lome-ride.png'});
+ await page.getByRole('button',{name:'Arcade'}).click();await page.getByRole('button',{name:/Fermer/}).click();await expect(page.getByRole('heading',{name:'Choisis ton défi.'})).toHaveCount(0);
+});
